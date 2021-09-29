@@ -1,13 +1,14 @@
 
 import { Account, Connection, PublicKey, SystemProgram, TransactionInstruction, Transaction, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
-import { deserializeHAMTNode, serializeSetValueInstruction, AnnounceStateSize, HAMTNodeSize } from "./serialization.mjs";
+import { deserializeHAMTNode, serializeAnnounceInstruction, AnnounceStateSize, HAMTNodeSize } from "./serialization.mjs";
 import { Command } from "commander";
 import { getRoot, dumpNode, lookup } from "./hamt.mjs";
+import *  as base58 from "bs58";
 
-const signerAccount = new Account(new Uint8Array([64,26,82,89,7,207,32,204,43,235,63,151,123,16,233,79,100,116,87,112,223,34,117,14,87,189,199,51,187,200,57,83,229,235,248,218,204,175,70,229,70,166,99,88,218,103,183,188,103,198,119,82,180,62,43,126,179,239,125,84,136,36,196,109]));
-const programID = new PublicKey("7HnngbGgWDRj8Yno976E3qi7ZFuhC2MSsxPTq36CUSDX");
+const signerAccount = new Account(new Uint8Array([149,168,13,129,58,167,135,27,13,110,187,205,6,188,154,160,82,29,39,200,148,195,206,89,13,131,153,191,184,142,120,230,194,24,225,115,139,94,5,229,29,100,181,252,131,252,216,9,52,157,37,41,105,24,126,215,92,147,246,6,237,247,255,212]));
+const programID = new PublicKey("4xTvGbGnJxJeZjbMECmBPPCuzdb3ZYyHG3hTbQk3V5rZ");
 const connection = new Connection("http://localhost:8899", 'singleGossip');
-
+// state address: FR1pAtrqDE4opTrLPsZQCWcN4YDkwEpEeozJYSeBwVf9
 /**
  * Init HAMT
  * Initialize a new HAMT with a program state account and root node.
@@ -32,7 +33,6 @@ const init = async () => {
     ],
     data: Buffer.from([0]),
   })
-  
   const tx = new Transaction().add(createProgramAccountIx, initIx);
   let str = await connection.sendTransaction(tx, [signerAccount, stateAccount], {skipPreflight: false, preflightCommitment: 'singleGossip'});
 
@@ -41,27 +41,33 @@ const init = async () => {
 }
 
 /**
- * Set Value
- * @param state address of announcement program state
+ * Announce a batch
+ * @param stateAddress - state address of Announcement Program state
  * @param url url of the announcement
  * @param hash hash of the announcement content
  */
-const announce = async (state, url, hash) => {
+const announce = async (stateAddress, url, hash) => {
+  console.log( Object.keys(base58) )
 
   const announcementSize = 32 + 4 + url.length + 32;
-
+  // get id of state account
+  // get url & hash (from cli)
+  // create a new account (node)
+  // set instruction data  (serialized)
+  //
   const announcementAccount = new Account();
-  const createProgramAccountIx = SystemProgram.createAccount({
+  const createAnnouncementAccountIx = SystemProgram.createAccount({
     space: announcementSize,
     lamports: await connection.getMinimumBalanceForRentExemption(announcementSize, 'singleGossip'),
     fromPubkey: signerAccount.publicKey,
     newAccountPubkey: announcementAccount.publicKey,
     programId: programID
   });
+  const hashBytes = base58.default.decode(hash)
 
   const keys = [
     { pubkey: signerAccount.publicKey, isSigner: true, isWritable: false },
-    { pubkey: state, isSigner: true, isWritable: true },
+    { pubkey: stateAddress, isSigner: false, isWritable: true }, // writable so we can increment the index and set the root (head)
     { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false},
     { pubkey: announcementAccount, isSigner: false, isWritable: true },
   ]
@@ -69,24 +75,22 @@ const announce = async (state, url, hash) => {
   const setIx = new TransactionInstruction({
     programId: programID,
     keys,
-    data: serializeAnnounceInstruction(url, hash),
+    data: serializeAnnounceInstruction(url, hashBytes),
   })
-  console.log("Instruction", setIx)
+  console.log("created setInstruction", setIx)
 
-  const tx = new Transaction().add(setIx);
-  console.log("Sending Transaction") 
+  const tx = new Transaction().add(createAnnouncementAccountIx, setIx);
+  console.log("Sending Transaction")
   const txSignature = await connection.sendTransaction(
-      tx, 
-      [signerAccount], 
+      tx,
+      [signerAccount, announcementAccount],
       {skipPreflight: false, preflightCommitment: 'singleGossip'});
-  
-  console.log("Transaction:", sendResult.txSignature)  
 
-  await connection.confirmTransaction(sendResult.txSignature)
-  const result = await connection.getTransaction(sendResult.txSignature, {commitment: 'confirmed'})
+  console.log("Transaction:", txSignature)
 
-  // for await (let nodeKey of fullPath) await dumpNode(connection, nodeKey);
-
+  await connection.confirmTransaction(txSignature)
+  const result = await connection.getTransaction(txSignature, {commitment: 'confirmed'})
+  console.log({ result })
   process.exit(0);
 }
 
@@ -217,8 +221,8 @@ const _setValue = async (hamt, key, value) => {
 
   const tx = new Transaction().add(...collisionInstructions, setIx);
   result.txSignature = await connection.sendTransaction(
-      tx, 
-      [signerAccount, ...collisionAccounts], 
+      tx,
+      [signerAccount, ...collisionAccounts],
       {skipPreflight: false, preflightCommitment: 'singleGossip'});
   return result
 }
@@ -238,7 +242,7 @@ const _setValueForBench = async (hamt, key, value) => {
     result.compute = parseInt(txData.meta.logMessages
       .filter(l=>l.match(computeRegexp))[0]
       .match(computeRegexp)[1])
-    
+
     return result
   } catch (error) {
     console.log(`Error setting ${key}`)
@@ -286,12 +290,11 @@ const range = (count) => ({
    .description('create a new HAMT state account')
    .action(init);
  program
-   .command('announce <state> <url> <hash>')
+   .command('announce <stateAddress> <url> <hash>')
    .description('saves announcement to chain')
    .action(announce);
  program
-   .command('get <state> <starting_index>')
+   .command('get <stateAddress> <starting_index>')
    .description('get list of announcements starting at index')
    .action(getAnnouncements);
  program.parse(process.argv)
- 
