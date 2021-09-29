@@ -46,28 +46,23 @@ impl Processor {
         let account_info_iter = &mut accounts.iter();
 
         let _setter = next_account_info(account_info_iter)?;
-        let hamt_account = next_account_info(account_info_iter)?;
+        let announce_state_account = next_account_info(account_info_iter)?;
         let rent = &Rent::from_account_info(next_account_info(account_info_iter)?)?;
 
-        if !rent.is_exempt(hamt_account.lamports(), hamt_account.data_len()) {
+        if !rent.is_exempt(announce_state_account.lamports(), announce_state_account.data_len()) {
             return Err(AnnounceError::NotRentExempt.into());
         }
-
-        let root_account = next_account_info(account_info_iter)?;
 
         // initialize state
-        let mut hamt_info = AnnounceState::unpack(&hamt_account.data.borrow())?;
-        if hamt_info.is_initialized() {
+        let mut announce_state = AnnounceState::unpack(&announce_state_account.data.borrow())?;
+        if announce_state.is_initialized() {
             return Err(AnnounceError::InvalidInstruction.into());
         }
-        hamt_info.is_initialized = true;
-        hamt_info.root_pubkey = *root_account.key;
+        announce_state.is_initialized = true;
+        announce_state.root_pubkey = Pubkey::default();
+        announce_state.current_index = 0;
 
-        if !rent.is_exempt(root_account.lamports(), root_account.data_len()) {
-            return Err(AnnounceError::NotRentExempt.into());
-        }
-
-        AnnounceState::pack(&hamt_info, &mut hamt_account.data.borrow_mut());
+        AnnounceState::pack(&announce_state, &mut announce_state_account.data.borrow_mut());
 
         Ok(())
     }
@@ -87,22 +82,24 @@ impl Processor {
         let rent = &Rent::from_account_info(next_account_info(account_info_iter)?)?;
 
         // State must already be initialized
-        let announce_state = AnnounceState::unpack(&announce_state.data.borrow())?;
-        if !announce_state.is_initialized() {
+        let mut announce_state_data = AnnounceState::unpack(&announce_state.data.borrow())?;
+        if !announce_state_data.is_initialized() {
             return Err(AnnounceError::InvalidInstruction.into());
         }
+        announce_state_data.current_index +=1;
+        AnnounceState::pack(&announce_state_data, &mut announce_state.data.borrow_mut());
         
-        let mut announcement = next_account_info(account_info_iter)?;
+        let announcement = next_account_info(account_info_iter)?;
         if !rent.is_exempt(announcement.lamports(), announcement.data_len()) {
             return Err(AnnounceError::NotRentExempt.into());
         }
 
         let mut announcement_data = Announcement::unpack(&announcement.data.borrow())?;
         announcement_data.url = url;
-        announcement_data.hash = Hash::from_str(hash);
-        announcement_data.next = announce_info.root_pubkey;
-
-        Announcement::pack(&announcment_data, &mut announcement.data.borrow_mut());
+        announcement_data.hash = hash;
+        announcement_data.next = announce_state_data.root_pubkey;
+        
+        Announcement::pack(&announcement_data, &mut announcement.data.borrow_mut());
 
         return Ok(())
     }

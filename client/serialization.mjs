@@ -18,13 +18,13 @@ class Assignable {
 /**
  * Set value instruction
  */
-const SetValueKind = 1;
-export class SetValueInstruction extends Assignable { }
-const schema = new Map([[SetValueInstruction, { kind: 'struct', fields: [['kind', 'u8'], ['key', 'string'], ['value', 'u64']] }]]);
+const AnnouncementKind = 1;
+export class AnnouncementInstruction extends Assignable { }
+const schema = new Map([[AnnouncementInstruction, { kind: 'struct', fields: [['kind', 'u8'], ['url', 'string'], ['hash', [32]]] }]]);
 
-export const serializeSetValueInstruction = (key, value) => {
+export const serializeAnnounceInstruction = (url, hash) => {
   const kind = SetValueKind;
-  const ix = new SetValueInstruction({ kind, key, value });
+  const ix = new AnnouncementInstruction({ kind, url, hash });
   return serialize(schema, ix);  
 }
 
@@ -36,7 +36,7 @@ export const HAMTStateSchema = new Map([
   [HAMTState, { kind: 'struct', fields: [['is_initialized', 'u8'], ['root_pubkey', [32]]] }],
 ]);
 
-export const HAMTStateSize = 33;
+export const AnnounceStateSize = 41;
 
 /**
  * HAMT Slot

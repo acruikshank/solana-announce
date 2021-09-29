@@ -647,6 +647,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "solana-announce"
+version = "0.1.0"
+dependencies = [
+ "arrayref",
+ "borsh",
+ "solana-program",
+ "thiserror",
+]
+
+[[package]]
 name = "solana-frozen-abi"
 version = "1.7.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -676,16 +686,6 @@ dependencies = [
  "quote",
  "rustc_version",
  "syn",
-]
-
-[[package]]
-name = "solana-hamt"
-version = "0.1.0"
-dependencies = [
- "arrayref",
- "borsh",
- "solana-program",
- "thiserror",
 ]
 
 [[package]]

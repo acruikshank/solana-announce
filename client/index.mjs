@@ -1,11 +1,11 @@
 
 import { Account, Connection, PublicKey, SystemProgram, TransactionInstruction, Transaction, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
-import { deserializeHAMTNode, serializeSetValueInstruction, HAMTStateSize, HAMTNodeSize } from "./serialization.mjs";
+import { deserializeHAMTNode, serializeSetValueInstruction, AnnounceStateSize, HAMTNodeSize } from "./serialization.mjs";
 import { Command } from "commander";
 import { getRoot, dumpNode, lookup } from "./hamt.mjs";
 
-const signerAccount = new Account(new Uint8Array([46,139,140,139,17,3,211,126,63,25,51,125,199,143,156,254,123,246,90,109,95,190,202,71,244,236,69,47,101,37,153,193,38,208,13,251,62,220,212,80,139,6,146,11,249,66,25,204,185,216,43,115,35,158,33,82,246,36,144,88,255,124,243,144]));
-const programID = new PublicKey("Dqbmj4xvKZENKwNX8BwdbcCLeNVRojUCe2GWmEDnGjj6");
+const signerAccount = new Account(new Uint8Array([64,26,82,89,7,207,32,204,43,235,63,151,123,16,233,79,100,116,87,112,223,34,117,14,87,189,199,51,187,200,57,83,229,235,248,218,204,175,70,229,70,166,99,88,218,103,183,188,103,198,119,82,180,62,43,126,179,239,125,84,136,36,196,109]));
+const programID = new PublicKey("7HnngbGgWDRj8Yno976E3qi7ZFuhC2MSsxPTq36CUSDX");
 const connection = new Connection("http://localhost:8899", 'singleGossip');
 
 /**
@@ -13,22 +13,13 @@ const connection = new Connection("http://localhost:8899", 'singleGossip');
  * Initialize a new HAMT with a program state account and root node.
  * Outputs the HAMT address which identified the HAMT instance for future calls.
  */
-const initHAMT = async () => {
+const init = async () => {
   const stateAccount = new Account();
   const createProgramAccountIx = SystemProgram.createAccount({
-    space: HAMTStateSize,
-    lamports: await connection.getMinimumBalanceForRentExemption(HAMTStateSize, 'singleGossip'),
+    space: AnnounceStateSize,
+    lamports: await connection.getMinimumBalanceForRentExemption(AnnounceStateSize, 'singleGossip'),
     fromPubkey: signerAccount.publicKey,
     newAccountPubkey: stateAccount.publicKey,
-    programId: programID
-  });
-  
-  const rootAccount = new Account();
-  const createRootAccountIx = SystemProgram.createAccount({
-    space: HAMTNodeSize,
-    lamports: await connection.getMinimumBalanceForRentExemption(HAMTNodeSize, 'singleGossip'),
-    fromPubkey: signerAccount.publicKey,
-    newAccountPubkey: rootAccount.publicKey,
     programId: programID
   });
 
@@ -38,27 +29,56 @@ const initHAMT = async () => {
         { pubkey: signerAccount.publicKey, isSigner: true, isWritable: false },
         { pubkey: stateAccount.publicKey, isSigner: false, isWritable: true },
         { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false},
-        { pubkey: rootAccount.publicKey, isSigner: false, isWritable: true },
     ],
     data: Buffer.from([0]),
   })
   
-  const tx = new Transaction().add(createProgramAccountIx, createRootAccountIx, initIx);
-  let str = await connection.sendTransaction(tx, [signerAccount, stateAccount, rootAccount], {skipPreflight: false, preflightCommitment: 'singleGossip'});
+  const tx = new Transaction().add(createProgramAccountIx, initIx);
+  let str = await connection.sendTransaction(tx, [signerAccount, stateAccount], {skipPreflight: false, preflightCommitment: 'singleGossip'});
 
-  console.log("HAMT Address:", stateAccount.publicKey.toBase58());
-  console.log("Root Address:", rootAccount.publicKey.toBase58());
+  console.log("State Address:", stateAccount.publicKey.toBase58());
   process.exit(0)
 }
 
 /**
  * Set Value
- * @param hamt address of hamt program state
- * @param key string key to store
- * @param value numeric value to store
+ * @param state address of announcement program state
+ * @param url url of the announcement
+ * @param hash hash of the announcement content
  */
-const setValue = async (hamt, key, value) => {
-  let sendResult = await _setValue(new PublicKey(hamt), key, value)
+const announce = async (state, url, hash) => {
+
+  const announcementSize = 32 + 4 + url.length + 32;
+
+  const announcementAccount = new Account();
+  const createProgramAccountIx = SystemProgram.createAccount({
+    space: announcementSize,
+    lamports: await connection.getMinimumBalanceForRentExemption(announcementSize, 'singleGossip'),
+    fromPubkey: signerAccount.publicKey,
+    newAccountPubkey: announcementAccount.publicKey,
+    programId: programID
+  });
+
+  const keys = [
+    { pubkey: signerAccount.publicKey, isSigner: true, isWritable: false },
+    { pubkey: state, isSigner: true, isWritable: true },
+    { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false},
+    { pubkey: announcementAccount, isSigner: false, isWritable: true },
+  ]
+
+  const setIx = new TransactionInstruction({
+    programId: programID,
+    keys,
+    data: serializeAnnounceInstruction(url, hash),
+  })
+  console.log("Instruction", setIx)
+
+  const tx = new Transaction().add(setIx);
+  console.log("Sending Transaction") 
+  const txSignature = await connection.sendTransaction(
+      tx, 
+      [signerAccount], 
+      {skipPreflight: false, preflightCommitment: 'singleGossip'});
   
   console.log("Transaction:", sendResult.txSignature)  
 
@@ -76,7 +96,7 @@ const setValue = async (hamt, key, value) => {
  * @param hamt address of hamt program state
  * @param key string key to fetch
  */
-const getValue = async (hamt, key) => {
+const getAnnouncements = async (hamt, key) => {
   const result = await lookup(connection, new PublicKey(hamt), key);
 
   if (result.value === undefined) {
@@ -264,22 +284,14 @@ const range = (count) => ({
  program
    .command('init')
    .description('create a new HAMT state account')
-   .action(initHAMT);
+   .action(init);
  program
-   .command('set <hamt> <key> <value>')
-   .description('sets an integer value for a key into the hamt')
-   .action(setValue);
+   .command('announce <state> <url> <hash>')
+   .description('saves announcement to chain')
+   .action(announce);
  program
-   .command('get <hamt> <key>')
-   .description('retrieves a value from the hamt')
-   .action(getValue);
- program
-   .command('bench <hamt> <count>')
-   .description('sets count values into the hamt, verifies them, and prints stats')
-   .action(bench);
-program
-   .command('rent <size>')
-   .description('computes cost in lamports to rent-exempt an account of the given size')
-   .action(rent);
+   .command('get <state> <starting_index>')
+   .description('get list of announcements starting at index')
+   .action(getAnnouncements);
  program.parse(process.argv)
  
