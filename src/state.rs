@@ -14,6 +14,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 pub struct AnnounceState {
     pub is_initialized: bool,
     pub root_pubkey: Pubkey,
+    pub current_index: u64,
 }
 
 impl Sealed for AnnounceState {}
