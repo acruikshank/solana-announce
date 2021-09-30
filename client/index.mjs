@@ -47,8 +47,6 @@ const init = async () => {
  * @param hash hash of the announcement content
  */
 const announce = async (stateAddress, url, hash) => {
-  console.log( Object.keys(base58) )
-
   const announcementSize = 32 + 4 + url.length + 32;
   // get id of state account
   // get url & hash (from cli)
@@ -77,20 +75,23 @@ const announce = async (stateAddress, url, hash) => {
     keys,
     data: serializeAnnounceInstruction(url, hashBytes),
   })
-  console.log("created setInstruction", setIx)
 
   const tx = new Transaction().add(createAnnouncementAccountIx, setIx);
   console.log("Sending Transaction")
-  const txSignature = await connection.sendTransaction(
-      tx,
-      [signerAccount, announcementAccount],
-      {skipPreflight: false, preflightCommitment: 'singleGossip'});
+  try {
+    const txSignature = await connection.sendTransaction(
+        tx,
+        [signerAccount, announcementAccount],
+        {skipPreflight: false, preflightCommitment: 'singleGossip'});
 
-  console.log("Transaction:", txSignature)
+    console.log("Transaction:", txSignature)
 
-  await connection.confirmTransaction(txSignature)
-  const result = await connection.getTransaction(txSignature, {commitment: 'confirmed'})
-  console.log({ result })
+    await connection.confirmTransaction(txSignature)
+    const result = await connection.getTransaction(txSignature, {commitment: 'confirmed'})
+    console.log({result})
+  } catch (e) {
+    console.trace(e)
+  }
   process.exit(0);
 }
 
