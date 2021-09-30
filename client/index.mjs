@@ -67,7 +67,7 @@ const announce = async (stateAddress, url, hash) => {
     { pubkey: signerAccount.publicKey, isSigner: true, isWritable: false },
     { pubkey: stateAddress, isSigner: false, isWritable: true }, // writable so we can increment the index and set the root (head)
     { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false},
-    { pubkey: announcementAccount, isSigner: false, isWritable: true },
+    { pubkey: announcementAccount.publicKey, isSigner: false, isWritable: true },
   ]
 
   const setIx = new TransactionInstruction({
@@ -78,6 +78,7 @@ const announce = async (stateAddress, url, hash) => {
 
   const tx = new Transaction().add(createAnnouncementAccountIx, setIx);
   console.log("Sending Transaction")
+
   try {
     const txSignature = await connection.sendTransaction(
         tx,
