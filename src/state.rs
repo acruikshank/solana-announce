@@ -31,9 +31,9 @@ impl IsInitialized for AnnounceState {
  */
 #[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug)]
 pub struct Announcement {
-    pub url: String,
-    pub hash: Hash,
-    pub next: Pubkey,
+    pub hash: Hash, //32
+    pub next: Pubkey, //32
+    pub url: String, 
 }
 
 impl Sealed for Announcement {}

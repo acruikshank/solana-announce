@@ -19,13 +19,12 @@ class Assignable {
  * Set value instruction
  */
 const AnnouncementKind = 1;
-const SetValueKind=2;
 export class AnnouncementInstruction extends Assignable { }
 const schema = new Map([[AnnouncementInstruction, { kind: 'struct', fields: [['kind', 'u8'], ['url', 'string'], ['hash', [32]]] }]]);
 
 export const serializeAnnounceInstruction = (url, hash) => {
-  const kind = SetValueKind;
-  const ix = new AnnouncementInstruction({ kind, url, hash });
+  const kind = AnnouncementKind;
+  const ix = new AnnouncementInstruction({ kind, url, hash});
   return serialize(schema, ix);
 }
 
