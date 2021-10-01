@@ -23,9 +23,9 @@ export class AnnouncementInstruction extends Assignable { }
 const schema = new Map([[AnnouncementInstruction, { kind: 'struct', fields: [['kind', 'u8'], ['url', 'string'], ['hash', [32]]] }]]);
 
 export const serializeAnnounceInstruction = (url, hash) => {
-  const kind = SetValueKind;
-  const ix = new AnnouncementInstruction({ kind, url, hash });
-  return serialize(schema, ix);  
+  const kind = AnnouncementKind;
+  const ix = new AnnouncementInstruction({ kind, url, hash});
+  return serialize(schema, ix);
 }
 
 /**
@@ -41,7 +41,7 @@ export const AnnounceStateSize = 41;
 /**
  * HAMT Slot
  */
-export class HAMTSlot extends Assignable { 
+export class HAMTSlot extends Assignable {
   toString() {
     return `value: ${this.value.toString()}, hash: ${new PublicKey(Buffer.from(this.key_hash)).toBase58()}, link: ${new PublicKey(Buffer.from(this.link)).toBase58()}`
   }
