@@ -1,8 +1,7 @@
 
 import { Account, Connection, PublicKey, SystemProgram, TransactionInstruction, Transaction, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
-import { deserializeHAMTNode, serializeAnnounceInstruction, AnnounceStateSize, HAMTNodeSize } from "./serialization.mjs";
+import { deserializeHAMTNode, deserializeAnnounceInstruction, serializeAnnounceInstruction, AnnounceStateSize, HAMTNodeSize } from "./serialization.mjs";
 import { Command } from "commander";
-import *  as base58 from "bs58";
 import sha256 from 'crypto-js/sha256.js';
 import encHex from 'crypto-js/enc-hex.js';
 
@@ -74,7 +73,7 @@ const announce = async (stateAddress, url, serializedAnnouncement) => {
     newAccountPubkey: announcementAccount.publicKey,
     programId: programID
   });
-  
+
 
   const keys = [
     { pubkey: signerAccount.publicKey, isSigner: true, isWritable: false },
@@ -122,6 +121,12 @@ const getAnnouncements = async (hamt, key) => {
     console.log(result.value.toString())
     process.exit(0);
   }
+}
+
+const lookup = async(conn, pubKey) => {
+  const res= await conn.getAccountInfo(pubKey, 'singleGossip')
+  const data = deserializeAnnounceInstruction(res.data)
+  console.log(data)
 }
 
 /**

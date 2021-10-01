@@ -17,7 +17,7 @@ impl Serdes for AnnounceInstruction {}
 /// 1. `[writable]` Account to hold Announce state data (33 bytes)
 /// 2. `[]` The rent sysvar
 #[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug)]
-pub struct Init { 
+pub struct Init {
     kind: AnnounceInstruction
 }
 
@@ -36,6 +36,7 @@ pub struct Announce {
     pub kind: AnnounceInstruction,
     pub url: String,
     pub hash: Hash,
+    // Why is there no 'next' field here?
 }
 
 impl Serdes for Announce {}

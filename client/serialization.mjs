@@ -20,13 +20,25 @@ class Assignable {
  */
 const AnnouncementKind = 1;
 export class AnnouncementInstruction extends Assignable { }
-const schema = new Map([[AnnouncementInstruction, { kind: 'struct', fields: [['kind', 'u8'], ['url', 'string'], ['hash', [32]]] }]]);
+// why is there no 'next' here?
+const AnnouncementInstructionSchema = new Map([[AnnouncementInstruction, { kind: 'struct', fields: [['kind', 'u8'], ['url', 'string'], ['hash', [32]] ] }]]);
 
 export const serializeAnnounceInstruction = (url, hash) => {
   const kind = AnnouncementKind;
   const ix = new AnnouncementInstruction({ kind, url, hash});
-  return serialize(schema, ix);
+  return serialize(AnnouncementInstructionSchema, ix);
 }
+// export const deserializeHAMTNode = (b) => deserialize(HAMTNodeSchema, HAMTNode, Buffer.concat([jsArrayPrefix, b]))
+export const deserializeAnnounceInstruction = (data) => {
+    const buflen = jsArrayPrefix.byteLength + data.length
+    deserialize(
+        AnnouncementInstructionSchema,
+        AnnouncementInstruction,
+        Buffer.concat([jsArrayPrefix,data], buflen))
+}
+
+
+
 
 /**
  * HAMT State

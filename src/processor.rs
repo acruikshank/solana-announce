@@ -1,13 +1,10 @@
-use std::cmp;
-
-
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
     entrypoint::ProgramResult,
     program_pack::{IsInitialized},
     pubkey::Pubkey,
     sysvar::{rent::Rent, Sysvar},
-    hash::{ Hash, hash },
+    hash::{ Hash },
     msg,
 };
 
@@ -17,8 +14,6 @@ use crate::{
     util::Serdes,
     state::{ AnnounceState, Announcement }
 };
-
-use std::mem;
 
 pub struct Processor;
 impl Processor {
@@ -32,10 +27,10 @@ impl Processor {
         if instruction_type == 0 {
             return Self::process_init(accounts, program_id)
         }
-        
+
         else if instruction_type == 1 {
             let instruction = Announce::unpack(instruction_data)?;
-            return Self::process_announce(accounts, instruction.hash, instruction.url, program_id)
+            return Self::process_announce(accounts, instruction.url, instruction.hash, program_id)
         }
 
         Err(AnnounceError::InvalidInstruction.into())
@@ -71,8 +66,8 @@ impl Processor {
 
     fn process_announce(
         accounts: &[AccountInfo],
-        hash: Hash,
         url: String,
+        hash: Hash,
         _program_id: &Pubkey,
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
@@ -88,13 +83,13 @@ impl Processor {
         if !announce_state_data.is_initialized() {
             return Err(AnnounceError::InvalidInstruction.into());
         }
-        
+
         let announcement = &next_account_info(account_info_iter)?;
         if !rent.is_exempt(announcement.lamports(), announcement.data_len()) {
             return Err(AnnounceError::NotRentExempt.into());
         }
-        
-        let fake_announcement_data = Announcement {hash, url, next: announce_state_data.root_pubkey };
+
+        let fake_announcement_data = Announcement { url,hash, next: announce_state_data.root_pubkey };
         Announcement::pack(&fake_announcement_data, &mut announcement.data.borrow_mut());
 
         //update state object to increment index and set the new root to the new announcement
